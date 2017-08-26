@@ -1,19 +1,35 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
 import socket
 import msghole
 from gi.repository import Gio
 from gi.repository import GObject
-from ass_util import AssUtil
-from ass_util import FlexObject
 
 
-class AssPeerManager:
+def get_plugin_list():
+    return [
+        "mesh",
+    ]
 
-    def __init__(self, param):
-        self.param = param
 
+def get_plugin_properties(name):
+    if name == "mesh":
+        return dict()
+    else:
+        assert False
+
+
+def get_plugin_object(name):
+    if name == "mesh":
+        return _PluginObject()
+    else:
+        assert False
+
+
+class _PluginObject:
+
+    def init2(self):
         self.netPeerDict = dict()           # dict<hostname, _NetPeerData>
         self.diskPeerDict = dict()          # dict<hostname, _DiskPeerData>
         self.netStandbyPeerSet = set()      # set<hostname>
@@ -21,6 +37,14 @@ class AssPeerManager:
 
         self.apiServer = _ApiServer(self)
         self.opmWrtdAdvHost = _OnlinePeerManagerWrtdAdvHost(self, self.apiServer.port)
+
+    def dispose(self):
+        pass
+
+    def add_api_for_reflex(reflex_object):
+        pass
+
+
 
     def _netPeerAppear(self, hostname, ip, port, net_type, can_wakeup):
         if hostname in self.netStandbyPeerSet:
@@ -67,67 +91,6 @@ class _DiskPeerData:
     def __init__(self, dev):
         self.dev = dev
 
-
-class _ApiServer:
-
-    def __init__(self, pObj):
-        self.pObj = pObj
-        self.logger = self.pObj.logger
-        self.port = AssUtil.getFreeSocketPort("tcp")
-
-        self.serverSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.serverSock.bind(('0.0.0.0', self.port))
-        self.serverSock.listen(5)
-        self.serverSock.setblocking(0)
-        self.serverSourceId = GLib.io_add_watch(self.serverSock, GLib.IO_IN | _flagError, self.on_accept)
-
-        self.sockDict = dict()
-
-    def on_accept(self, source, cb_condition):
-        try:
-            assert not (cb_condition & _flagError)
-            assert source == self.serverSock
-
-            new_sock, addr = self.serverSock.accept()
-            for p in self.pObj.netPeerDict.values():
-                if addr[0] == p.ip:
-                    obj = FlexObject()
-                    obj.buf = bytes()
-                    obj.watch = GLib.io_add_watch(new_sock, GLib.IO_IN | _flagError, self.on_recv)
-                    self.sockDict[new_sock] = obj
-                    return True
-
-            new_sock.close()
-            self.logger.error("%s is not a peer, reject." % (addr[0]))
-            return True
-        except:
-            self.logger.error("Error occured in accept callback.", exc_info=True)
-            return True
-
-    def on_recv(self, source, cb_condition):
-        try:
-            assert source in self.sockDict
-
-            if cb_condition & _flagError:
-                source.close()
-                del self.sockDict[source]
-                return False
-
-            buf2 = source.recv(4096)
-            if len(buf2) == 0:
-                self._sendMessageToApplication(source.get_peer_address()[0], self.sockDict[source].buf)
-                source.close()
-                del self.sockDict[source]
-                return False
-
-            self.sockDict[source].buf += buf2
-            return True
-        except:
-            self.logger.error("Error occured in receive callback", exc_info=True)
-            return True
-
-    def _sendMessageToApplication(self, src_ip, buf):
-        pass
 
 
 
