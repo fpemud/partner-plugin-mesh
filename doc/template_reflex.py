@@ -4,14 +4,32 @@
 
 ###############################################################################
 # reflex-property-dict:
-#     "mesh-peer-role": "server" OR "client" OR "p2p-endpoint"
+#     "protocol": PROTOCOL-NAME
+#     "role": "server" OR "server-per-client" OR "client" OR "p2p-endpoint"
 ###############################################################################
-def get_properties(name):
+def get_properties(name, plugin_name=None):
     # returns plugin-property-dict
     assert False
 
 
-class ReflexObject:
+class ReflexObjectServer:
+
+    @property
+    def peer_info(self):
+        # returns {
+        #     "hostname": HOSTNAME,
+        #     "ip": IP-ADDRESS,
+        #     "uid": USER-ID,
+        # }
+
+    def on_receive_message_from_peer(self, hostname, message):
+        assert False
+
+    def send_message_to_peer(self, hostname, message):
+        assert False
+
+
+class ReflexObjectServerPerClient:
 
     @property
     def peer_info(self):
@@ -26,6 +44,16 @@ class ReflexObject:
 
     def send_message_to_peer(self, message):
         assert False
+
+
+class ReflexObjectServerPerClient:
+    # same as ReflexObjectServerPerClient
+    pass
+
+
+class ReflexObjectP2pEndpoint:
+    # same as ReflexObjectServerPerClient
+    pass
 
 
 # the above template is for both system reflex and user reflex

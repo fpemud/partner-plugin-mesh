@@ -1,8 +1,9 @@
 #!/usr/bin/python3
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
+import json
+import logging
 import socket
-import msghole
 from gi.repository import Gio
 from gi.repository import GObject
 from .opm.wrtd_advhost import OnlinePeerManagerWrtdAdvHost
@@ -30,51 +31,60 @@ def get_plugin_object(name):
 
 class _PluginObject:
 
-    def init2(self):
+    def init2(self, reflex_environment):
+        self.logger = logging.getLogger(self.__module__ + "." + self.__class__.__name__)
+
+        self.envObj = reflex_environment
+        self.envObj.get_plugin_data("mesh") = {
+            "peer-list": {},
+        }
+
         self.netPeerDict = dict()           # dict<hostname, _NetPeerData>
         self.diskPeerDict = dict()          # dict<hostname, _DiskPeerData>
         self.netStandbyPeerSet = set()      # set<hostname>
-        self.__load()
+        self._load()
 
         self.apiServer = _ApiServer(self)
-        self.opmWrtdAdvHost = OnlinePeerManagerWrtdAdvHost(self.logger, self.apiServer.port, self.on_net_peer_appear, self.on_net_peer_disappear, self.on_net_peer_wakeup_change)
+
+        self.opmWrtdAdvHost = OnlinePeerManagerWrtdAdvHost(self.logger,
+                                                           self.apiServer.port,
+                                                           self.on_net_peer_appear,
+                                                           self.on_net_peer_disappear,
+                                                           self.on_net_peer_wakeup_change)
 
     def dispose(self):
-        pass
+        self.opmWrtdAdvHost.close()
+        self.apiServer.close()
 
-    def is_reflex_env_ok(reflex_name, reflex_property_dict):
-        if reflex_property_dict["mesh-peer-role"] == "server":
-            if reflex_name not in self.
-
-
-        elif reflex_property_dict["mesh-peer-role"] == "client":
-
-        elif reflex_property_dict["mesh-peer-role"] == "p2p-endpoint":
-
-        else:
-            assert False
-
-    def reflex_pre_init(reflex_name, reflex_property_dict, reflex_object):
+    def reflex_pre_init(fullname, properties, obj):
         assert False
 
-    def reflex_post_fini(reflex_name, reflex_property_dict, reflex_object):
+    def reflex_post_fini(fullname, properties, obj):
         assert False
 
     def on_net_peer_appear(self, hostname, ip, port, net_type, can_wakeup):
         if hostname in self.netStandbyPeerSet:
             self.netStandbyPeerSet.remove(hostname)
         self.netPeerDict[hostname] = _NetPeerData(ip, port, net_type, can_wakeup)
-        self.__save()
+        self._save()
+
+        self.envObj.get_plugin_data("mesh")["peer-list"][hostname] = {
+            "reflex-list": dict()
+        }
+        self.envObj.changed()
 
     def on_net_peer_disappear(self, hostname):
         if self.netPeerDict[hostname].can_wakeup:
             self.netStandbyPeerSet.add(hostname)
         del self.netPeerDict[hostname]
-        self.__save()
+        self._save()
+
+        del self.envObj.get_plugin_data("mesh")["peer-list"][hostname]
+        self.envObj.changed()
 
     def on_net_peer_wakeup_change(self, hostname, value):
         self.netPeerDict[hostname].can_wakeup = value
-        self.__save()
+        self._save()
 
     def on_disk_peer_appear(self, hostname, dev):
         self.diskPeerDict[hostname] = _DiskPeerData(dev)
@@ -82,19 +92,21 @@ class _PluginObject:
     def on_disk_peer_disappear(self, hostname):
         del self.diskPeerDict[hostname]
 
-    def on_peer_reflex_add(self, hostname, reflex_name, reflex_property_dict):
+    def on_peer_reflex_add(self, hostname, reflex_fullname, reflex_property_dict):
+        self.envObj.get_plugin_data("mesh")["peer-list"][hostname]["reflex-list"][reflex_fullname] = reflex_property_dict
+        self.envObj.changed()
+
+    def on_peer_reflex_removed(self, hostname, reflex_fullname):
+        del self.envObj.get_plugin_data("mesh")["peer-list"][hostname]["reflex-list"][reflex_fullname]
+        self.envObj.changed()
+
+    def on_peer_message_received(self, hostname, reflex_fullname, message):
         pass
 
-    def on_peer_reflex_removed(self, hostname, reflex_name):
+    def _load(self):
         pass
 
-    def on_peer_message_received(self, hostname, reflex_name, message):
-        pass
-
-    def __load(self):
-        pass
-
-    def __save(self):
+    def _save(self):
         pass
 
 
@@ -178,32 +190,29 @@ class _ApiServer:
     def _sendMessageToApplication(self, src_ip, buf):
         data = json.loads(buf)
 
+        hostname = None
+        for hostname2, data in self.pObj.netPeerDict.items():
+            if data.ip == src_ip:
+                hostname = hostname2
+                break
+        if hostname is None:
+            raise Exception("invalid message received from %s" % (src_ip))
+
         if "reflex-add" in data:
-            for name, propDict in data["reflex-add"].items():
-                self.pObj.on_peer_reflex_add(name, propDict)
+            for fullname, propDict in data["reflex-add"].items():
+                self.pObj.on_peer_reflex_add(hostname, fullname, propDict)
             return
 
         if "reflex-remove" in data:
-            for name in data["reflex-remove"]:
-                self.pObj.on_peer_reflex_remove(name)
+            for fullname in data["reflex-remove"]:
+                self.pObj.on_peer_reflex_remove(hostname, fullname)
             return
         
         if "app-message" in data:
-
+            self.pObj.on_peer_message_received(hostname, data["source"], data["data"])
+            return
 
         raise Exception("invalid message received")
-
-    def on_peer_reflex_add(self, reflex_name, reflex_property_dict):
-        pass
-
-    def on_peer_reflex_removed(self, reflex_name):
-        pass
-
-    def on_peer_message_received(self, hostname, message):
-        pass
-
-
-
 
 
 _flagError = GLib.IO_PRI | GLib.IO_ERR | GLib.IO_HUP | GLib.IO_NVAL

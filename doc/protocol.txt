@@ -4,8 +4,8 @@
 #
 # {
 #     "reflex-add": {
-#         "reflex-name1": reflex-property-dict,
-#         "reflex-name2": reflex-property-dict,
+#         "reflex-full-name1": reflex-property-dict,
+#         "reflex-full-name2": reflex-property-dict,
 #     },
 # }
 #
@@ -15,8 +15,8 @@
 #
 # {
 #     "reflex-remove": [
-#         "reflex-name1",
-#         "reflex-name2",
+#         "reflex-full-name1",
+#         "reflex-full-name2",
 #     ],
 # }
 #
@@ -26,7 +26,7 @@
 #
 # {
 #     "app-message": {
-#         "source": "reflex-name",
+#         "source": "reflex-full-name",
 #         "data": DATA,
 #     }
 # }
