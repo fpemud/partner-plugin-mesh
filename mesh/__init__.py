@@ -44,6 +44,8 @@ class _PluginObject:
         self.netStandbyPeerSet = set()      # set<hostname>
         self._load()
 
+        self.reflexDict = dict()            # dict<reflex-fullname, reflex-property-dict>
+
         self.apiServer = _ApiServer(self)
 
         self.opmWrtdAdvHost = OnlinePeerManagerWrtdAdvHost(self.logger,
@@ -56,11 +58,46 @@ class _PluginObject:
         self.opmWrtdAdvHost.close()
         self.apiServer.close()
 
-    def reflex_pre_init(fullname, properties, obj):
-        assert False
+    def get_good_reflexes(self, reflex_name, reflex_properties):
+        if reflex_properties["role"] == "server":
+            return [reflex_name]
+        
+        if reflex_properties["role"] in ["server-per-client", "p2p-endpoint"]:
+            ret = []
+            for peername, data in self.netPeerDict.items():
+                ret.append(reflex_name + "." + peername)
+            return ret
 
-    def reflex_post_fini(fullname, properties, obj):
-        assert False
+        if reflex_properties["role"] == "client":
+            ret = []
+            for peername, data in self.netPeerDict.items():
+                for reflex_fullname2, data2 in data.reflexDict.items():
+                    if data2["protocol"] == reflex_properties["protocol"]:
+                        if data2["role"] == "server":
+                            ret.append(reflex_name + "." + peername)
+                        elif data2["role"] == "server-per-client" and reflex_fullname2 == reflex_name + "." + socket.gethostname():
+                            ret.append(reflex_name + "." + peername)
+            return ret
+
+    def reflex_pre_init(reflex_fullname, reflex_properties, obj):
+        reflex_properties = reflex_properties.copy()
+        reflex_properties.pop("knowledge")
+        reflex_properties.pop("hint-in")
+        reflex_properties.pop("hint-out")
+        self.reflexDict[reflex_fullname] = reflex_properties
+
+        if reflex_properties["role"] in ["server-per-client", "p2p-endpoint", "client"]:
+            peername = reflex_fullname.split(".")[1]
+            obj.peer_info = {
+                "hostname": peername,
+                "ip": self.netPeerDict[peername],
+            }
+            obj.send_message_to_peer = None
+        else:
+            obj.send_message_to_peer = None
+
+    def reflex_post_fini(reflex_fullname, reflex_properties):
+        del self.reflexDict[reflex_fullname]
 
     def on_net_peer_appear(self, hostname, ip, port, net_type, can_wakeup):
         if hostname in self.netStandbyPeerSet:

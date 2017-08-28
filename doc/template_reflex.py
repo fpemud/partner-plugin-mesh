@@ -15,12 +15,8 @@ def get_properties(name, plugin_name=None):
 class ReflexObjectServer:
 
     @property
-    def peer_info(self):
-        # returns {
-        #     "hostname": HOSTNAME,
-        #     "ip": IP-ADDRESS,
-        #     "uid": USER-ID,
-        # }
+    def my_hostname(self):
+        assert False
 
     def on_receive_message_from_peer(self, hostname, message):
         assert False
@@ -38,6 +34,10 @@ class ReflexObjectServerPerClient:
         #     "ip": IP-ADDRESS,
         #     "uid": USER-ID,
         # }
+
+    @property
+    def my_hostname(self):
+        assert False
 
     def on_receive_message_from_peer(self, message):
         assert False
