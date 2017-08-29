@@ -18,10 +18,10 @@ class ReflexObjectServer:
     def my_hostname(self):
         assert False
 
-    def on_receive_message_from_peer(self, hostname, message):
+    def on_receive_message_from_peer(self, peer_hostname, message):
         assert False
 
-    def send_message_to_peer(self, hostname, message):
+    def send_message_to_peer(self, peer_hostname, message):
         assert False
 
 
