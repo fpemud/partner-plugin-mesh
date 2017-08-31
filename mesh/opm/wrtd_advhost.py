@@ -1,6 +1,12 @@
 #!/usr/bin/python3
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
+import msghole
+from gi.repository import Gio
+from gi.repository import GLib
+from gi.repository import GObject
+from ..util import Util
+
 
 class OnlinePeerManagerWrtdAdvHost(msghole.EndPoint):
 
@@ -30,8 +36,8 @@ class OnlinePeerManagerWrtdAdvHost(msghole.EndPoint):
     def on_start(self):
         try:
             self.logger.info("Establishing WRTD-ADVHOST connection.")
-            self.sc.connect_to_host_async(AssUtil.getGatewayIpAddress(), self.advhostApiPort, None, self.on_connect)
-        except:
+            self.sc.connect_to_host_async(Util.getGatewayIpAddress(), self.advhostApiPort, None, self.on_connect)
+        except BaseException:
             self.logger.error("Failed to establish WRTD-ADVHOST connection", exc_info=True)
             self._closeAndRestart()
         finally:
@@ -44,7 +50,7 @@ class OnlinePeerManagerWrtdAdvHost(msghole.EndPoint):
             super().set_iostream_and_start(conn)
             self.logger.info("WRTD-ADVHOST connection established.")
             super().exec_command("get-host-list", self.on_command_get_host_list_return, self.on_command_get_host_list_error)
-        except:
+        except BaseException:
             self.logger.error("Failed to establish WRTD-ADVHOST connection", exc_info=True)
             self._closeAndRestart()
 
@@ -84,7 +90,7 @@ class OnlinePeerManagerWrtdAdvHost(msghole.EndPoint):
             if not ok1 and not ok2:
                 pass
             elif ok1 and not ok2:
-                self.disappearFunc(hostname)
+                self.disappearFunc(hostname1)
             elif not ok1 and ok2:
                 port, net_type, can_wakeup = self.__data2info(data2)
                 self.appearFunc(hostname2, ip, port, net_type, can_wakeup)
