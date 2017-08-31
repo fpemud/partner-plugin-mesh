@@ -13,7 +13,7 @@ class OnlinePeerManagerWrtdAdvHost(msghole.EndPoint):
     def __init__(self, logger, myPort, appearFunc, disappearFunc, setWakeupFunc):
         super().__init__()
 
-        self.logger = self.logger
+        self.logger = logger
         self.appearFunc = appearFunc
         self.disappearFunc = disappearFunc
 

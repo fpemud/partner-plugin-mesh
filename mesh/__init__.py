@@ -39,7 +39,9 @@ class _PluginObject:
         self.logger = logging.getLogger(self.__module__ + "." + self.__class__.__name__)
 
         self.envObj = reflex_environment
-        self.envObj.get_plugin_data("mesh")["peer-list"] = dict()
+        self.envObj.set_plugin_data("mesh", {
+            "peer-list": dict(),
+        })
 
         self.netPeerDict = dict()           # dict<hostname, _NetPeer>
         self.diskPeerDict = dict()          # dict<hostname, _DiskPeerData>
@@ -294,7 +296,7 @@ class _ApiServer:
     def __init__(self, pObj):
         self.pObj = pObj
         self.logger = self.pObj.logger
-        self.port = Util.getFreeSocketPort("tcp")
+        self.port = Util.getFreeSocketPort("tcp", 10000, 65535)
 
         self.serverSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.serverSock.bind(('0.0.0.0', self.port))

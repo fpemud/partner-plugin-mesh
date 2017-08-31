@@ -10,7 +10,7 @@ class Util:
 
     @staticmethod
     def getGatewayIpAddress():
-        ret = subprocess.check_call("/bin/route -n4", "stdout")
+        ret = subprocess.check_output(["/bin/route", "-n4"]).decode("utf-8")
         # syntax: DestIp GatewayIp DestMask ... OutIntf
         m = re.search("^(0\\.0\\.0\\.0)\\s+([0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+)\\s+(0\\.0\\.0\\.0)\\s+.*\\s+(\\S+)$", ret, re.M)
         if m is None:
