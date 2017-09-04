@@ -8,7 +8,7 @@ from gi.repository import GObject
 from ..util import Util
 
 
-class OnlinePeerManagerWrtdAdvHost(msghole.EndPoint):
+class OnlinePeerManager(msghole.EndPoint):
 
     def __init__(self, logger, myPort, appearFunc, disappearFunc, setWakeupFunc):
         super().__init__()
@@ -50,12 +50,12 @@ class OnlinePeerManagerWrtdAdvHost(msghole.EndPoint):
             self.logger.error("Failed to establish WRTD-ADVHOST connection", exc_info=True)
             self._closeAndRestart()
 
-
-            super().set_iostream_and_start(conn)
+        try:
+            self.set_iostream_and_start(conn)
             self.logger.info("WRTD-ADVHOST connection established.")
-            super().exec_command("get-host-list",
-                                 return_callback=self.on_command_get_host_list_return,
-                                 error_callback=self.on_command_get_host_list_error)
+            self.exec_command("get-host-list",
+                              return_callback=self.on_command_get_host_list_return,
+                              error_callback=self.on_command_get_host_list_error)
         except:
             self.logger.error("Failed to establish WRTD-ADVHOST connection", exc_info=True)
             self._closeAndRestart()

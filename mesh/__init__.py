@@ -10,7 +10,6 @@ import queue
 from gi.repository import GLib
 from .util import Util
 from .util import FlexObject
-from .opm.wrtd_advhost import OnlinePeerManagerWrtdAdvHost
 
 
 def get_plugin_list():
@@ -52,14 +51,21 @@ class _PluginObject:
 
         self.apiServer = _ApiServer(self)
 
-        self.opmWrtdAdvHost = OnlinePeerManagerWrtdAdvHost(self.logger,
-                                                           self.apiServer.port,
-                                                           self.on_net_peer_appear,
-                                                           self.on_net_peer_disappear,
-                                                           self.on_net_peer_wakeup_change)
+        self.opmList = []
+        for fn in glob.glob(os.path.join(os.path.dirname(__file__), "opm", "*.py"):
+            bn = os.path.basename(fn)
+            mod = bn[:-3]
+            exec("from .opm.%s import OnlinePeerManager" % (mod))
+            obj = OnlinePeerManagerWrtdAdvHost(self.logger,
+                                               self.apiServer.port,
+                                               self.on_net_peer_appear,
+                                               self.on_net_peer_disappear,
+                                               self.on_net_peer_wakeup_change)
+            self.opmList.append(obj)
 
     def dispose(self):
-        self.opmWrtdAdvHost.close()
+        for obj in self.opmList:
+            obj.dispose()
         self.apiServer.close()
 
     def get_good_reflexes(self, reflex_name, reflex_properties):
