@@ -1,11 +1,15 @@
 #!/usr/bin/python3
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
+import time
 import json
 import logging
 import socket
-from gi.repository import Gio
-from gi.repository import GObject
+import threading
+import queue
+from gi.repository import GLib
+from .util import Util
+from .util import FlexObject
 from .opm.wrtd_advhost import OnlinePeerManagerWrtdAdvHost
 
 
@@ -35,9 +39,9 @@ class _PluginObject:
         self.logger = logging.getLogger(self.__module__ + "." + self.__class__.__name__)
 
         self.envObj = reflex_environment
-        self.envObj.get_plugin_data("mesh") = {
-            "peer-list": {},
-        }
+        self.envObj.set_plugin_data("mesh", {
+            "peer-list": dict(),
+        })
 
         self.netPeerDict = dict()           # dict<hostname, _NetPeer>
         self.diskPeerDict = dict()          # dict<hostname, _DiskPeerData>
@@ -61,7 +65,7 @@ class _PluginObject:
     def get_good_reflexes(self, reflex_name, reflex_properties):
         if reflex_properties["role"] == "server":
             return [reflex_name]
-        
+
         if reflex_properties["role"] in ["server-per-client", "p2p-endpoint"]:
             ret = []
             for peername in self.envObj.get_plugin_data("mesh")["peer-list"]:
@@ -71,7 +75,7 @@ class _PluginObject:
         if reflex_properties["role"] == "client":
             ret = []
             for peername, peerdata in self.envObj.get_plugin_data("mesh")["peer-list"].items():
-                for reflex_fullname, reflex_data in peerdata.["reflex-list"].items():
+                for reflex_fullname, reflex_data in peerdata["reflex-list"].items():
                     if reflex_data["protocol"] == reflex_properties["protocol"]:
                         if reflex_data["role"] == "server":
                             ret.append(reflex_name + "." + peername)
@@ -79,13 +83,15 @@ class _PluginObject:
                             ret.append(reflex_name + "." + peername)
             return ret
 
-    def reflex_pre_init(reflex_fullname, reflex_properties, obj):
+    def reflex_pre_init(self, reflex_fullname, reflex_properties, obj):
+        # record
         reflex_properties = reflex_properties.copy()
         reflex_properties.pop("knowledge")
         reflex_properties.pop("hint-in")
         reflex_properties.pop("hint-out")
         self.reflexDict[reflex_fullname] = (reflex_properties, obj)
 
+        # modify obj
         if reflex_properties["role"] in ["server-per-client", "p2p-endpoint", "client"]:
             peername = reflex_fullname.split(".")[1]
             obj.peer_info = {
@@ -96,49 +102,74 @@ class _PluginObject:
         else:
             obj.send_message_to_peer = lambda peername, data: self._send_message(reflex_fullname, peername, data)
 
-    def reflex_post_fini(reflex_fullname, reflex_properties):
+        # send to peer
+        data = {
+            "reflex-add": {
+                reflex_fullname: reflex_properties,
+            }
+        }
+        for peername in self.netPeerDict:
+            self.netPeerDict[peername].messageQueue.put(data)
+
+    def reflex_post_fini(self, reflex_fullname, reflex_properties):
+        # record
         del self.reflexDict[reflex_fullname]
 
-    def on_net_peer_appear(self, hostname, ip, port, net_type, can_wakeup):
-        if hostname in self.netStandbyPeerSet:
-            self.netStandbyPeerSet.remove(hostname)
-        self.netPeerDict[hostname] = _NetPeer(ip, port, net_type, can_wakeup)
-        self._save()
+        # send to peer
+        data = {
+            "reflex-remove": [
+                reflex_fullname,
+            ]
+        }
+        for peername in self.netPeerDict:
+            self.netPeerDict[peername].messageQueue.put(data)
 
-        self.envObj.get_plugin_data("mesh")["peer-list"][hostname] = {
+    def on_net_peer_appear(self, peername, ip, port, net_type, can_wakeup):
+        if peername in self.netStandbyPeerSet:
+            self.netStandbyPeerSet.remove(peername)
+        self.netPeerDict[peername] = _NetPeer(ip, port, net_type, can_wakeup)
+        self._save()
+        self.logger.info("Network peer %s(%s:%d) appeared." % (peername, ip, port))
+
+        self.envObj.get_plugin_data("mesh")["peer-list"][peername] = {
             "reflex-list": dict()
         }
         self.envObj.changed()
 
-    def on_net_peer_disappear(self, hostname):
-        if self.netPeerDict[hostname].can_wakeup:
-            self.netStandbyPeerSet.add(hostname)
-        del self.netPeerDict[hostname]
+    def on_net_peer_disappear(self, peername):
+        ip = self.netPeerDict[peername].ip
+        port = self.netPeerDict[peername].port
+        if self.netPeerDict[peername].can_wakeup:
+            self.netStandbyPeerSet.add(peername)
+        del self.netPeerDict[peername]
         self._save()
+        self.logger.info("Network peer %s(%s:%d) disappeared." % (peername, ip, port))
 
-        del self.envObj.get_plugin_data("mesh")["peer-list"][hostname]
+        del self.envObj.get_plugin_data("mesh")["peer-list"][peername]
         self.envObj.changed()
 
-    def on_net_peer_wakeup_change(self, hostname, value):
-        self.netPeerDict[hostname].can_wakeup = value
+    def on_net_peer_wakeup_change(self, peername, value):
+        self.netPeerDict[peername].can_wakeup = value
         self._save()
 
-    def on_disk_peer_appear(self, hostname, dev):
-        self.diskPeerDict[hostname] = _DiskPeerData(dev)
+    def on_disk_peer_appear(self, peername, dev):
+        self.diskPeerDict[peername] = _DiskPeerData(dev)
 
-    def on_disk_peer_disappear(self, hostname):
-        del self.diskPeerDict[hostname]prop2
+    def on_disk_peer_disappear(self, peername):
+        del self.diskPeerDict[peername]
 
-    def on_peer_reflex_add(self, hostname, reflex_fullname, reflex_property_dict):
-        self.envObj.get_plugin_data("mesh")["peer-list"][hostname]["reflex-list"][reflex_fullname] = reflex_property_dict
+    def on_peer_reflex_add(self, peername, reflex_fullname, reflex_property_dict):
+        self.envObj.get_plugin_data("mesh")["peer-list"][peername]["reflex-list"][reflex_fullname] = reflex_property_dict
+        self.logger.info("Network peer %s gets reflex \"%s\"." % (peername, reflex_fullname))
         self.envObj.changed()
 
-    def on_peer_reflex_removed(self, hostname, reflex_fullname):
-        del self.envObj.get_plugin_data("mesh")["peer-list"][hostname]["reflex-list"][reflex_fullname]
+    def on_peer_reflex_removed(self, peername, reflex_fullname):
+        del self.envObj.get_plugin_data("mesh")["peer-list"][peername]["reflex-list"][reflex_fullname]
+        self.logger.info("Network peer %s loses reflex \"%s\"." % (peername, reflex_fullname))
         self.envObj.changed()
 
     def on_peer_message_received(self, peername, reflex_fullname, data):
-        reflex_properties = self.envObj.get_plugin_data("mesh")["peer-list"][hostname]["reflex-list"][reflex_fullname]
+        reflex_properties = self.envObj.get_plugin_data("mesh")["peer-list"][peername]["reflex-list"][reflex_fullname]
 
         fullname = self._match_reflex(peername, reflex_fullname, reflex_properties)
         if fullname is None:
@@ -151,13 +182,13 @@ class _PluginObject:
             self.reflexDict[fullname][1].on_receive_message_from_peer(data)
 
     def _send_message(self, reflex_fullname, peername, data):
-        data = {
+        data2 = {
             "app-message": {
                 "source": reflex_fullname,
-                "data": message,
+                "data": data,
             }
         }
-        self.netPeerDict[peername].messageQueue.put(data)
+        self.netPeerDict[peername].messageQueue.put(data2)
 
     def _match_reflex(self, peername, reflex_fullname, reflex_properties):
         name, insname = _reflex_split_fullname(reflex_fullname)
@@ -166,7 +197,7 @@ class _PluginObject:
         for fullname2, value in self.reflexDict.items():
             name2, insname2 = _reflex_split_fullname(fullname2)
             prop2 = value[0]
-            if self.__match(name, insname, reflex_properties, name2, insname2, prop2, peername)
+            if self.__match(name, insname, reflex_properties, name2, insname2, prop2, peername):
                 return fullname2
         return None
 
@@ -176,11 +207,11 @@ class _PluginObject:
 
         for fullname2, prop2 in self.envObj.get_plugin_data("mesh")["peer-list"][peername]["reflex-list"].items():
             name2, insname2 = _reflex_split_fullname(fullname2)
-            if self.__match(name, insname, reflex_properties, name2, insname2, prop2, socket.gethostname())
+            if self.__match(name, insname, reflex_properties, name2, insname2, prop2, socket.gethostname()):
                 return fullname2
         return None
 
-    def __match(name, insname, prop, name2, insname2, prop2, hostname)
+    def __match(name, insname, prop, name2, insname2, prop2, hostname):
         if name2 != name:
             return False
         if insname2 != "" and insname2 != hostname:
@@ -246,7 +277,7 @@ class _NetPeer(threading.Thread):
                     if s is not None:
                         s.close()
                     for i in range(0, 10):
-                        if bStop:
+                        if self.bStop:
                             return
                         time.sleep(10)
 
@@ -264,7 +295,7 @@ class _ApiServer:
     def __init__(self, pObj):
         self.pObj = pObj
         self.logger = self.pObj.logger
-        self.port = Util.getFreeSocketPort("tcp")
+        self.port = Util.getFreeSocketPort("tcp", 10000, 65535)
 
         self.serverSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.serverSock.bind(('0.0.0.0', self.port))
@@ -291,7 +322,7 @@ class _ApiServer:
             new_sock.close()
             self.logger.error("%s is not a peer, reject." % (addr[0]))
             return True
-        except:
+        except BaseException:
             self.logger.error("Error occured in accept callback.", exc_info=True)
             return True
 
@@ -313,7 +344,7 @@ class _ApiServer:
 
             self.sockDict[source].buf += buf2
             return True
-        except:
+        except BaseException:
             self.logger.error("Error occured in receive callback", exc_info=True)
             return True
 
@@ -337,7 +368,7 @@ class _ApiServer:
             for fullname in data["reflex-remove"]:
                 self.pObj.on_peer_reflex_remove(hostname, fullname)
             return
-        
+
         if "app-message" in data:
             self.pObj.on_peer_message_received(hostname, data["source"], data["data"])
             return
