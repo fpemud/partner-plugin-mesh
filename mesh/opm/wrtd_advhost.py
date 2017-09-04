@@ -43,7 +43,9 @@ class OnlinePeerManagerWrtdAdvHost(msghole.EndPoint):
             conn = source_object.connect_to_host_finish(res)
             super().set_iostream_and_start(conn)
             self.logger.info("WRTD-ADVHOST connection established.")
-            super().exec_command("get-host-list", self.on_command_get_host_list_return, self.on_command_get_host_list_error)
+            super().exec_command("get-host-list",
+                                 return_callback=self.on_command_get_host_list_return,
+                                 error_callback=self.on_command_get_host_list_error)
         except:
             self.logger.error("Failed to establish WRTD-ADVHOST connection", exc_info=True)
             self._closeAndRestart()
