@@ -1,12 +1,14 @@
 #!/usr/bin/python3
 # -*- coding: utf-8; tab-width: 4; indent-tabs-mode: t -*-
 
+import os
 import time
 import json
 import logging
 import socket
 import threading
 import queue
+import glob
 from gi.repository import GLib
 from .util import Util
 from .util import FlexObject
@@ -52,15 +54,11 @@ class _PluginObject:
         self.apiServer = _ApiServer(self)
 
         self.opmList = []
-        for fn in glob.glob(os.path.join(os.path.dirname(__file__), "opm", "*.py"):
+        for fn in glob.glob(os.path.join(os.path.dirname(__file__), "opm", "*.py")):
             bn = os.path.basename(fn)
             mod = bn[:-3]
             exec("from .opm.%s import OnlinePeerManager" % (mod))
-            obj = OnlinePeerManagerWrtdAdvHost(self.logger,
-                                               self.apiServer.port,
-                                               self.on_net_peer_appear,
-                                               self.on_net_peer_disappear,
-                                               self.on_net_peer_wakeup_change)
+            obj = eval("OnlinePeerManager(self.logger, self.apiServer.port, self.on_net_peer_appear, self.on_net_peer_disappear, self.on_net_peer_wakeup_change)")
             self.opmList.append(obj)
 
     def dispose(self):
