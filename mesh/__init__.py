@@ -51,7 +51,6 @@ class _PluginObject:
         self.reflexDict = dict()            # dict<reflex-fullname, (reflex-property-dict, reflex-object)>
 
         self.apiServer = _ApiServer(self)
-        self.logger.info("API server started at port %d." % (self.apiServer.port))
 
         self.opmWrtdAdvHost = OnlinePeerManagerWrtdAdvHost(self.logger,
                                                            self.apiServer.port,
@@ -305,6 +304,14 @@ class _ApiServer:
         self.serverSourceId = GLib.io_add_watch(self.serverSock, GLib.IO_IN | _flagError, self.on_accept)
 
         self.sockDict = dict()
+
+    def close(self):
+        if True:
+            GLib.source_remove(self.serverSourceId)
+            self.serverSock.close()
+        for sock, obj in self.sockDict.items():
+            GLib.source_remove(obj.watch)
+            sock.close()
 
     def on_accept(self, source, cb_condition):
         try:

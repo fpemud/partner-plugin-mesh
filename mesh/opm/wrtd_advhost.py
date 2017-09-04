@@ -18,7 +18,7 @@ class OnlinePeerManagerWrtdAdvHost(msghole.EndPoint):
         self.disappearFunc = disappearFunc
 
         self.advhostApiPort = 2222
-        self.advhostRetryTimeout = 3600
+        self.advhostRetryTimeout = 3600         # in seconds
 
         self.sc = Gio.SocketClient.new()
         self.sc.set_family(Gio.SocketFamily.IPV4)
@@ -34,32 +34,41 @@ class OnlinePeerManagerWrtdAdvHost(msghole.EndPoint):
         self.close()
 
     def on_start(self):
+        self.connectTimer = None
         try:
-            self.logger.info("Establishing WRTD-ADVHOST connection.")
-            self.sc.connect_to_host_async(Util.getGatewayIpAddress(), self.advhostApiPort, None, self.on_connect)
-        except BaseException:
+            self.sc.connect_to_host_async(Util.getGatewayIpAddress(), self.advhostApiPort, None, self.on_connected)
+        except:
             self.logger.error("Failed to establish WRTD-ADVHOST connection", exc_info=True)
-            self._closeAndRestart()
+            self._restart()
         finally:
             return False
 
-    def on_connect(self, source_object, res):
+    def on_connected(self, source_object, res):
         try:
-            self.connectTimer = None
             conn = source_object.connect_to_host_finish(res)
+        except:
+            self.logger.error("Failed to establish WRTD-ADVHOST connection", exc_info=True)
+            self._closeAndRestart()
+
+
             super().set_iostream_and_start(conn)
             self.logger.info("WRTD-ADVHOST connection established.")
-            super().exec_command("get-host-list", self.on_command_get_host_list_return, self.on_command_get_host_list_error)
-        except BaseException:
+            super().exec_command("get-host-list",
+                                 return_callback=self.on_command_get_host_list_return,
+                                 error_callback=self.on_command_get_host_list_error)
+        except:
             self.logger.error("Failed to establish WRTD-ADVHOST connection", exc_info=True)
             self._closeAndRestart()
 
     def on_command_get_host_list_return(self, data):
+        import json
+        self.logger.info("ABCD2, %s" % (json.dumps(data)))
         for ip, data2 in data.items():
             if "hostname" in data2 and "service-partner" in data2:
                 port, net_type, can_wakeup = self.__data2info(data2)
                 self.appearFunc(data2["hostname"], ip, port, net_type, can_wakeup)
         self.clientDict.update(data)
+        self.logger.info("ABCD3")
 
     def on_command_get_host_list_error(self, reason):
         self.logger.error("Command \"get-host-list\" error.", exc_info=True)
@@ -112,6 +121,10 @@ class OnlinePeerManagerWrtdAdvHost(msghole.EndPoint):
 
     def on_notification_network_list_change(self, data):
         pass
+
+    def _restart(self):
+        assert self.connectTimer is None
+        self.connectTimer = GObject.timeout_add_seconds(self.advhostRetryTimeout, self.on_start)
 
     def _closeAndRestart(self):
         assert self.connectTimer is None
