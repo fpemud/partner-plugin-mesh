@@ -36,8 +36,10 @@ def get_plugin_object(name):
 
 class _PluginObject:
 
-    def init2(self, reflex_environment):
+    def init2(self, cfg, reflex_environment):
         self.logger = logging.getLogger(self.__module__ + "." + self.__class__.__name__)
+
+        self.cfgObj = cfg
 
         self.envObj = reflex_environment
         self.envObj.set_plugin_data("mesh", {
@@ -58,7 +60,7 @@ class _PluginObject:
             bn = os.path.basename(fn)
             mod = bn[:-3]
             exec("from .opm.%s import OnlinePeerManager" % (mod))
-            obj = eval("OnlinePeerManager(self.logger, self.apiServer.port, self.on_net_peer_appear, self.on_net_peer_disappear, self.on_net_peer_wakeup_change)")
+            obj = eval("OnlinePeerManager(self.cfg, self.logger, self.apiServer.port, self.on_net_peer_appear, self.on_net_peer_disappear, self.on_net_peer_wakeup_change)")
             self.opmList.append(obj)
 
     def dispose(self):

@@ -10,9 +10,10 @@ from ..util import Util
 
 class OnlinePeerManager(msghole.EndPoint):
 
-    def __init__(self, logger, myPort, appearFunc, disappearFunc, setWakeupFunc):
+    def __init__(self, cfg, logger, myPort, appearFunc, disappearFunc, setWakeupFunc):
         super().__init__()
 
+        self.cfg = cfg
         self.logger = logger
         self.myPort = myPort
         self.appearFunc = appearFunc
@@ -39,7 +40,11 @@ class OnlinePeerManager(msghole.EndPoint):
     def on_start(self):
         self.connectTimer = None
         try:
-            self.sc.connect_to_host_async(Util.getGatewayIpAddress(), self.advhostApiPort, None, self.on_connected)
+            if "plugin-mesh" in self.cfg and "gateway-ip" in self.cfg["plugin-mesh"]:
+                gip = self.cfg["plugin-mesh"]["gateway-ip"]
+            else:
+                gip = Util.getGatewayIpAddress()
+            self.sc.connect_to_host_async(gip, self.advhostApiPort, None, self.on_connected)
         except BaseException:
             self.logger.error("Failed to establish WRTD-ADVHOST connection", exc_info=True)
             self._restart()

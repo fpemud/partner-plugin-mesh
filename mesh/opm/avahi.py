@@ -4,7 +4,7 @@
 
 class OnlinePeerManager:
 
-    def __init__(self, logger, myPort, appearFunc, disappearFunc, setWakeupFunc):
+    def __init__(self, cfg, logger, myPort, appearFunc, disappearFunc, setWakeupFunc):
         pass
 
     def dispose(self):
