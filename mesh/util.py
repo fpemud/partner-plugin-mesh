@@ -3,6 +3,7 @@
 
 import re
 import socket
+import netifaces
 import subprocess
 
 
@@ -16,6 +17,18 @@ class Util:
         if m is None:
             return None
         return m.group(2)
+
+    @staticmethod
+    def getMyIpAddresses():
+        ret = []
+        for ifname in netifaces.interfaces():
+            if ifname.startswith("lo"):
+                continue
+            v = netifaces.ifaddresses(ifname)
+            if netifaces.AF_INET not in v:
+                continue
+            ret.append(v[netifaces.AF_INET][0]["addr"])
+        return ret
 
     @staticmethod
     def getFreeSocketPort(portType, portStart, portEnd):

@@ -40,7 +40,7 @@ class OnlinePeerManager(msghole.EndPoint):
         self.connectTimer = None
         try:
             self.sc.connect_to_host_async(Util.getGatewayIpAddress(), self.advhostApiPort, None, self.on_connected)
-        except:
+        except BaseException:
             self.logger.error("Failed to establish WRTD-ADVHOST connection", exc_info=True)
             self._restart()
         finally:
@@ -51,7 +51,7 @@ class OnlinePeerManager(msghole.EndPoint):
             self.conn = source_object.connect_to_host_finish(res)
             self.set_iostream_and_start(self.conn)
             self.logger.info("WRTD-ADVHOST connection established.")
-        except:
+        except BaseException:
             self.logger.error("Failed to establish WRTD-ADVHOST connection", exc_info=True)
             self._restart()
             return
@@ -63,7 +63,7 @@ class OnlinePeerManager(msghole.EndPoint):
             self.exec_command("get-host-list",
                               return_callback=self.command_get_host_list_return,
                               error_callback=self.command_get_host_list_error)
-        except:
+        except BaseException:
             self.logger.error("Failed to establish WRTD-ADVHOST connection", exc_info=True)
             self.close()
             self._restart()
@@ -78,7 +78,7 @@ class OnlinePeerManager(msghole.EndPoint):
 
     def command_get_host_list_return(self, data):
         for ip, data2 in data.items():
-            if ip == self.conn.get_remote_address().get_address().to_string():
+            if ip in Util.getMyIpAddresses():
                 continue
             if "hostname" in data2 and "service-partner" in data2:
                 port, net_type, can_wakeup = self.__data2info(data2)
@@ -95,7 +95,7 @@ class OnlinePeerManager(msghole.EndPoint):
             return
 
         for ip, data2 in data.items():
-            if ip != self.conn.get_remote_address().get_address().to_string():
+            if ip in Util.getMyIpAddresses():
                 if "hostname" in data2 and "service-partner" in data2:
                     port, net_type, can_wakeup = self.__data2info(data2)
                     self.appearFunc(data2["hostname"], ip, port, net_type, can_wakeup)
@@ -106,7 +106,7 @@ class OnlinePeerManager(msghole.EndPoint):
             return
 
         for ip, data2 in data.items():
-            if ip != self.conn.get_remote_address().get_address().to_string():
+            if ip in self.clientDict:
                 hostname1 = self.clientDict[ip].get("hostname", None)
                 hostname2 = data2.get("hostname", None)
                 port1 = self.clientDict[ip].get("service-partner", None)
@@ -135,7 +135,7 @@ class OnlinePeerManager(msghole.EndPoint):
             return
 
         for ip in data:
-            if ip != self.conn.get_remote_address().get_address().to_string():
+            if ip in self.clientDict:
                 if "hostname" in self.clientDict[ip] and "service-partner" in self.clientDict[ip]:
                     self.disappearFunc(self.clientDict[ip]["hostname"])
                 del self.clientDict[ip]
@@ -151,3 +151,9 @@ class OnlinePeerManager(msghole.EndPoint):
         self.clientDict = None
         self.conn = None
         self.connectTimer = GObject.timeout_add_seconds(self.advhostRetryTimeout, self.on_start)
+
+    def __data2info(self, data):
+        port = data["service-partner"]
+        net_type = "narrowband" if "through-vpn" in data else "broadband"
+        can_wakeup = "can-wakeup" in data
+        return (port, net_type, can_wakeup)
