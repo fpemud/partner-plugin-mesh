@@ -105,8 +105,14 @@ class _PluginObject:
                 "ip": self.netPeerDict[peername],
             }
             obj.send_message_to_peer = lambda data: self._send_message(reflex_fullname, peername, data)
+            obj.get_file_from_peer = lambda peer_filename: self._get_file_from_peer(reflex_fullname, peername, peer_filename)
+            obj.pull_file_from_peer = lambda peer_filename, local_filename: self._pull_file_from_peer(reflex_fullname, peername, peer_filename, local_filename)
+            obj.pull_directory_from_peer = lambda peer_dirname, local_dirname, exclude_pattern=None, include_pattern=None: self._pull_directory_from_peer(reflex_fullname, peername, peer_dirname, local_dirname, exclude_pattern, include_pattern)
         else:
             obj.send_message_to_peer = lambda peername, data: self._send_message(reflex_fullname, peername, data)
+            obj.get_file_from_peer = lambda peername, peer_filename: self._get_file_from_peer(reflex_fullname, peername, peer_filename)
+            obj.pull_file_from_peer = lambda peername, peer_filename, local_filename: self._pull_file_from_peer(reflex_fullname, peername, peer_filename, local_filename)
+            obj.pull_directory_from_peer = lambda peername, peer_dirname, local_dirname, exclude_pattern=None, include_pattern=None: self._pull_directory_from_peer(reflex_fullname, peername, peer_dirname, local_dirname, exclude_pattern, include_pattern)
 
         # send to peer
         data = {
@@ -195,6 +201,15 @@ class _PluginObject:
             }
         }
         self.netPeerDict[peername].messageQueue.put(data2)
+
+    def _get_file_from_peer(self, reflex_fullname, peername, peer_filename):
+        return -1
+
+    def _pull_file_from_peer(self, reflex_fullname, peername, peer_filename, local_filename):
+        return -1
+
+    def _pull_directory_from_peer(self, reflex_fullname, peername, peer_dirname, local_dirname, exclude_pattern=None, include_pattern=None):
+        return -1
 
     def _match_reflex(self, peername, reflex_fullname, reflex_properties):
         name, insname = _reflex_split_fullname(reflex_fullname)
