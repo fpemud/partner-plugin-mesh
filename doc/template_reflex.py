@@ -5,7 +5,8 @@
 ###############################################################################
 # reflex-property-dict:
 #     "protocol": PROTOCOL-NAME
-#     "role": "server" OR "server-per-client" OR "client" OR "p2p-endpoint"
+#     "role": "server" OR "p2p"
+#             "server-per-client" OR "client" OR "p2p-per-peer"
 ###############################################################################
 def get_properties(name, plugin_name=None):
     # returns plugin-property-dict
@@ -16,6 +17,26 @@ class ReflexObjectServer:
 
     @property
     def my_hostname(self):
+        assert False
+
+    @property
+    def peer_info(self):
+        # returns [
+        #     {   "hostname": HOSTNAME,
+        #         "ip": IP-ADDRESS,
+        #         "uid": USER-ID,
+        #     },
+        #     {   "hostname": HOSTNAME,
+        #         "ip": IP-ADDRESS,
+        #         "uid": USER-ID,
+        #     },
+        # ]
+        assert False
+
+    def on_peer_appear(self, peer_hostname):
+        assert False
+
+    def on_peer_disappear(self, peer_hostname):
         assert False
 
     def send_message_to_peer(self, peer_hostname, message):
@@ -55,7 +76,16 @@ class ReflexObjectServer:
         assert False
 
 
+class ReflexObjectP2p:
+    # same as ReflexObjectServer
+    pass
+
+
 class ReflexObjectServerPerClient:
+
+    @property
+    def my_hostname(self):
+        assert False
 
     @property
     def peer_info(self):
@@ -64,9 +94,6 @@ class ReflexObjectServerPerClient:
         #     "ip": IP-ADDRESS,
         #     "uid": USER-ID,
         # }
-
-    @property
-    def my_hostname(self):
         assert False
 
     def on_receive_message_from_peer(self, message):
@@ -111,7 +138,7 @@ class ReflexObjectServerPerClient:
     pass
 
 
-class ReflexObjectP2pEndpoint:
+class ReflexObjectP2pPerPeer:
     # same as ReflexObjectServerPerClient
     pass
 

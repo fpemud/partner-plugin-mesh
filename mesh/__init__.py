@@ -69,10 +69,10 @@ class _PluginObject:
         self.apiServer.close()
 
     def get_good_reflexes(self, reflex_name, reflex_properties):
-        if reflex_properties["role"] == "server":
+        if reflex_properties["role"] in ["server", "p2p"]:
             return [reflex_name]
 
-        if reflex_properties["role"] in ["server-per-client", "p2p-endpoint"]:
+        if reflex_properties["role"] in ["server-per-client", "p2p-per-peer"]:
             ret = []
             for peername in self.envObj.get_plugin_data("mesh")["peer-list"]:
                 ret.append(reflex_name + "." + peername)
@@ -98,7 +98,12 @@ class _PluginObject:
         self.reflexDict[reflex_fullname] = (reflex_properties, obj)
 
         # modify obj
-        if reflex_properties["role"] in ["server-per-client", "p2p-endpoint", "client"]:
+        if reflex_properties["role"] in ["server", "p2p"]:
+            obj.send_message_to_peer = lambda peername, data: self._send_message(reflex_fullname, peername, data)
+            obj.get_file_from_peer = lambda peername, peer_filename: self._get_file_from_peer(reflex_fullname, peername, peer_filename)
+            obj.pull_file_from_peer = lambda peername, peer_filename, local_filename: self._pull_file_from_peer(reflex_fullname, peername, peer_filename, local_filename)
+            obj.pull_directory_from_peer = lambda peername, peer_dirname, local_dirname, exclude_pattern=None, include_pattern=None: self._pull_directory_from_peer(reflex_fullname, peername, peer_dirname, local_dirname, exclude_pattern, include_pattern)
+        elif reflex_properties["role"] in ["server-per-client", "p2p-per-peer"]:
             peername = reflex_fullname.split(".")[1]
             obj.peer_info = {
                 "hostname": peername,
@@ -109,10 +114,7 @@ class _PluginObject:
             obj.pull_file_from_peer = lambda peer_filename, local_filename: self._pull_file_from_peer(reflex_fullname, peername, peer_filename, local_filename)
             obj.pull_directory_from_peer = lambda peer_dirname, local_dirname, exclude_pattern=None, include_pattern=None: self._pull_directory_from_peer(reflex_fullname, peername, peer_dirname, local_dirname, exclude_pattern, include_pattern)
         else:
-            obj.send_message_to_peer = lambda peername, data: self._send_message(reflex_fullname, peername, data)
-            obj.get_file_from_peer = lambda peername, peer_filename: self._get_file_from_peer(reflex_fullname, peername, peer_filename)
-            obj.pull_file_from_peer = lambda peername, peer_filename, local_filename: self._pull_file_from_peer(reflex_fullname, peername, peer_filename, local_filename)
-            obj.pull_directory_from_peer = lambda peername, peer_dirname, local_dirname, exclude_pattern=None, include_pattern=None: self._pull_directory_from_peer(reflex_fullname, peername, peer_dirname, local_dirname, exclude_pattern, include_pattern)
+            assert False
 
         # send to peer
         data = {
@@ -243,11 +245,17 @@ class _PluginObject:
             return True
         if prop2["role"] == "server-per-client" and prop["role"] == "client":
             return True
-        if prop2["role"] == "p2p-endpoint" and prop["role"] == "p2p-endpoint":
-            return True
         if prop2["role"] == "client" and prop["role"] == "server":
             return True
         if prop2["role"] == "client" and prop["role"] == "server-per-client":
+            return True
+        if prop2["role"] == "p2p" and prop["role"] == "p2p":
+            return True
+        if prop2["role"] == "p2p" and prop["role"] == "p2p-per-peer":
+            return True
+        if prop2["role"] == "p2p-per-peer" and prop["role"] == "p2p":
+            return True
+        if prop2["role"] == "p2p-per-peer" and prop["role"] == "p2p-per-peer":
             return True
         return False
 
