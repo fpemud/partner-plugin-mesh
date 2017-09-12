@@ -33,7 +33,7 @@ class ReflexObjectServer:
         # ]
         assert False
 
-    def on_peer_appear(self, peer_hostname):
+    def on_peer_appear(self, peer_hostname, peer_ip, peer_uid):
         assert False
 
     def on_peer_disappear(self, peer_hostname):
