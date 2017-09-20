@@ -19,20 +19,6 @@ class ReflexObjectServer:
     def my_hostname(self):
         assert False
 
-    @property
-    def peer_info(self):
-        # returns [
-        #     {   "hostname": HOSTNAME,
-        #         "ip": IP-ADDRESS,
-        #         "uid": USER-ID,
-        #     },
-        #     {   "hostname": HOSTNAME,
-        #         "ip": IP-ADDRESS,
-        #         "uid": USER-ID,
-        #     },
-        # ]
-        assert False
-
     def on_peer_appear(self, peer_hostname, peer_ip, peer_uid):
         assert False
 
